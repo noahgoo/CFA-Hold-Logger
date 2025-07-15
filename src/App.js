@@ -19,11 +19,8 @@ function App() {
       <header className="bg-chickfila-red text-chickfila-white py-6 shadow-lg">
         <div className="container mx-auto px-6">
           <h1 className="text-3xl md:text-4xl font-bold text-center">
-            Chick-fil-A Button Logger
+            Chick-fil-A Hold Logger
           </h1>
-          <p className="text-center mt-2 opacity-90">
-            Track chicken item production
-          </p>
         </div>
       </header>
 
@@ -33,11 +30,9 @@ function App() {
         <section className="mb-8">
           <div className="bg-white rounded-2xl shadow-lg">
             <div className="p-6 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-800">
-                Production Buttons
-              </h2>
+              <h2 className="text-2xl font-bold text-gray-800">Hold Buttons</h2>
               <p className="text-gray-600 mt-1">
-                Click a button to log production. Each button has a 1-minute
+                Click a button to log holds. Each button has a 1-minute
                 cooldown.
               </p>
             </div>
@@ -55,7 +50,7 @@ function App() {
       <footer className="bg-gray-800 text-white py-4 mt-12">
         <div className="container mx-auto px-6 text-center">
           <p className="text-sm opacity-75">
-            Chick-fil-A Button Logger - Production Tracking System
+            Chick-fil-A Hold Logger - Hold Tracking System
           </p>
         </div>
       </footer>
