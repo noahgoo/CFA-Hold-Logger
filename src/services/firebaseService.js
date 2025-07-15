@@ -6,6 +6,9 @@ import {
   limit,
   getDocs,
   serverTimestamp,
+  doc,
+  deleteDoc,
+  updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
 
@@ -19,10 +22,10 @@ const COLLECTION_NAME = "button_presses";
  */
 export const logButtonPress = async (buttonType) => {
   try {
-    // Create timestamp in Hawaii Standard Time (GMT-10)
+    // Create timestamp in Hawaii Standard Time (HST)
+    // Since the user is already in Hawaii, use the current local time
     const now = new Date();
-    const hawaiiTime = new Date(now.getTime() - 10 * 60 * 60 * 1000); // Convert to HST
-    const timestamp = hawaiiTime.toISOString();
+    const timestamp = now.toISOString();
 
     // Add document to Firestore
     const docRef = await addDoc(collection(db, COLLECTION_NAME), {
@@ -104,6 +107,37 @@ export const getLogsByDateRange = async (startDate, endDate) => {
     return logs;
   } catch (error) {
     console.error("Error fetching logs by date range:", error);
+    throw error;
+  }
+};
+
+/**
+ * Delete a button press log from Firestore
+ * @param {string} logId - The ID of the log to delete
+ * @returns {Promise<void>}
+ */
+export const deleteLog = async (logId) => {
+  try {
+    await deleteDoc(doc(db, COLLECTION_NAME, logId));
+    console.log("Log deleted successfully:", logId);
+  } catch (error) {
+    console.error("Error deleting log:", error);
+    throw error;
+  }
+};
+
+/**
+ * Update a button press log in Firestore
+ * @param {string} logId - The ID of the log to update
+ * @param {Object} updates - The fields to update
+ * @returns {Promise<void>}
+ */
+export const updateLog = async (logId, updates) => {
+  try {
+    await updateDoc(doc(db, COLLECTION_NAME, logId), updates);
+    console.log("Log updated successfully:", logId);
+  } catch (error) {
+    console.error("Error updating log:", error);
     throw error;
   }
 };

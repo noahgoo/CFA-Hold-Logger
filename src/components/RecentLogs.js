@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
-import { getRecentLogs } from "../services/firebaseService";
+import { getRecentLogs, deleteLog } from "../services/firebaseService";
 
 const RecentLogs = ({ refreshTrigger }) => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [processingId, setProcessingId] = useState(null);
 
   // Fetch recent logs from Firebase
   const fetchLogs = async () => {
@@ -25,6 +26,22 @@ const RecentLogs = ({ refreshTrigger }) => {
   useEffect(() => {
     fetchLogs();
   }, [refreshTrigger]);
+
+  // Handle delete log
+  const handleDelete = async (logId) => {
+    if (window.confirm("Are you sure you want to delete this log?")) {
+      try {
+        setProcessingId(logId);
+        await deleteLog(logId);
+        await fetchLogs(); // Refresh the logs
+      } catch (err) {
+        console.error("Error deleting log:", err);
+        alert("Failed to delete log");
+      } finally {
+        setProcessingId(null);
+      }
+    }
+  };
 
   // Format timestamp for display in Hawaii time
   const formatTimestamp = (timestamp) => {
@@ -95,14 +112,26 @@ const RecentLogs = ({ refreshTrigger }) => {
               key={log.id}
               className="flex justify-between items-center p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
             >
-              <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-3 flex-1">
                 <span className="font-semibold text-chickfila-red">
                   {log.button_type}
                 </span>
               </div>
-              <span className="text-sm text-gray-600">
-                {formatTimestamp(log.timestamp)}
-              </span>
+
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-gray-600">
+                  {formatTimestamp(log.timestamp)}
+                </span>
+
+                <button
+                  onClick={() => handleDelete(log.id)}
+                  disabled={processingId === log.id}
+                  className="text-red-600 hover:text-red-700 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Delete"
+                >
+                  {processingId === log.id ? "⏳" : "🗑️"}
+                </button>
+              </div>
             </div>
           ))}
         </div>
