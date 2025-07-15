@@ -1,0 +1,30 @@
+.App {
+  text-align: center;
+}
+
+/* Custom scrollbar for the logs section */
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background: #e60e33;
+  border-radius: 3px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb:hover {
+  background: #c00d2b;
+}
+
+/* Ensure buttons are accessible on touch devices */
+@media (max-width: 768px) {
+  .btn-chickfila {
+    min-height: 100px;
+    font-size: 1.1rem;
+  }
+}
