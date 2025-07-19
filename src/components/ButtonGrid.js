@@ -1,94 +1,79 @@
 import React, { useState, useEffect } from "react";
-import { logButtonPress } from "../services/firebaseService";
 
-// Define the button types as specified in requirements
-const BUTTON_TYPES = [
+const BREAKFAST_BUTTONS = [
+  "Nuggets",
+  "Breakfast Filets",
+  "Spicy Breakfast Filets",
+  "Grilled Breakfast Filets",
+];
+
+const LUNCH_DINNER_BUTTONS = [
   "Nuggets",
   "Filets",
   "Spicy Filets",
+  "Strips",
   "Grilled Nuggets",
   "Grilled Filets",
-  "Strips",
 ];
 
-const ButtonGrid = ({ onButtonPress }) => {
-  // State to track which buttons are in cooldown
-  const [cooldowns, setCooldowns] = useState({});
-  const [loading, setLoading] = useState({});
+const ButtonGrid = ({ onButtonPress, isBreakfastMode, activeHolds }) => {
+  const [elapsedTimes, setElapsedTimes] = useState({});
 
-  // Handle button press with 1-minute cooldown
-  const handleButtonPress = async (buttonType) => {
-    // Check if button is in cooldown
-    if (cooldowns[buttonType]) {
-      return;
-    }
+  const buttonTypes = isBreakfastMode
+    ? BREAKFAST_BUTTONS
+    : LUNCH_DINNER_BUTTONS;
 
-    try {
-      setLoading((prev) => ({ ...prev, [buttonType]: true }));
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const newElapsedTimes = {};
+      for (const buttonType in activeHolds) {
+        const startTime = new Date(activeHolds[buttonType]);
+        const now = new Date();
+        const difference = now - startTime;
 
-      // Log the button press to Firebase
-      await logButtonPress(buttonType);
+        const hours = Math.floor(difference / (1000 * 60 * 60));
+        const minutes = Math.floor((difference / (1000 * 60)) % 60);
+        const seconds = Math.floor((difference / 1000) % 60);
 
-      // Set cooldown for this button (1 minute = 60000ms)
-      setCooldowns((prev) => ({ ...prev, [buttonType]: true }));
-
-      // Clear cooldown after 1 minute
-      setTimeout(() => {
-        setCooldowns((prev) => ({ ...prev, [buttonType]: false }));
-      }, 60000);
-
-      // Notify parent component
-      if (onButtonPress) {
-        onButtonPress(buttonType);
+        newElapsedTimes[buttonType] = 
+          `${hours.toString().padStart(2, '0')}:` +
+          `${minutes.toString().padStart(2, '0')}:` +
+          `${seconds.toString().padStart(2, '0')}`;
       }
-    } catch (error) {
-      console.error("Error handling button press:", error);
-      alert("Failed to log button press. Please try again.");
-    } finally {
-      setLoading((prev) => ({ ...prev, [buttonType]: false }));
-    }
-  };
+      setElapsedTimes(newElapsedTimes);
+    }, 1000);
 
-  // Format timestamp for display
-  const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleString("en-US", {
-      timeZone: "Pacific/Honolulu",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  };
+    return () => clearInterval(interval);
+  }, [activeHolds]);
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 gap-6 p-6">
-      {BUTTON_TYPES.map((buttonType) => {
-        const isInCooldown = cooldowns[buttonType];
-        const isLoading = loading[buttonType];
+      {buttonTypes.map((buttonType) => {
+        const isHeld = !!activeHolds[buttonType];
 
         return (
           <button
             key={buttonType}
-            onClick={() => handleButtonPress(buttonType)}
-            disabled={isInCooldown || isLoading}
+            onClick={() => onButtonPress(buttonType)}
             className={`
               btn-chickfila
-              ${isInCooldown ? "logged" : ""}
-              ${isLoading ? "animate-pulse" : ""}
+              ${isHeld ? "logged" : ""}
               text-lg md:text-xl
               min-h-[120px]
               flex flex-col items-center justify-center
               space-y-2
             `}
           >
-            <span className="font-bold">
-              {isLoading ? "Logging..." : buttonType}
-            </span>
-            {isInCooldown && (
-              <span className="text-sm opacity-75">Cooldown Active</span>
+            <span className="font-bold">{buttonType}</span>
+            {isHeld && (
+              <>
+                <span className="text-sm opacity-90 font-semibold">
+                  HOLDING
+                </span>
+                <span className="text-xs opacity-80 mt-1">
+                  {elapsedTimes[buttonType]}
+                </span>
+              </>
             )}
           </button>
         );

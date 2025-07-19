@@ -7,12 +7,11 @@ const RecentLogs = ({ refreshTrigger }) => {
   const [error, setError] = useState(null);
   const [processingId, setProcessingId] = useState(null);
 
-  // Fetch recent logs from Firebase
   const fetchLogs = async () => {
     try {
       setLoading(true);
       setError(null);
-      const recentLogs = await getRecentLogs(20); // Get last 20 logs
+      const recentLogs = await getRecentLogs(20);
       setLogs(recentLogs);
     } catch (err) {
       console.error("Error fetching logs:", err);
@@ -22,18 +21,16 @@ const RecentLogs = ({ refreshTrigger }) => {
     }
   };
 
-  // Fetch logs on component mount and when refreshTrigger changes
   useEffect(() => {
     fetchLogs();
   }, [refreshTrigger]);
 
-  // Handle delete log
   const handleDelete = async (logId) => {
     if (window.confirm("Are you sure you want to delete this log?")) {
       try {
         setProcessingId(logId);
         await deleteLog(logId);
-        await fetchLogs(); // Refresh the logs
+        await fetchLogs();
       } catch (err) {
         console.error("Error deleting log:", err);
         alert("Failed to delete log");
@@ -43,22 +40,29 @@ const RecentLogs = ({ refreshTrigger }) => {
     }
   };
 
-  // Format timestamp for display in Hawaii time
   const formatTimestamp = (timestamp) => {
+    if (!timestamp) return "N/A";
     try {
       const date = new Date(timestamp);
       return date.toLocaleString("en-US", {
         timeZone: "Pacific/Honolulu",
-        year: "numeric",
         month: "2-digit",
         day: "2-digit",
+        year: "2-digit",
         hour: "2-digit",
         minute: "2-digit",
-        second: "2-digit",
       });
     } catch (error) {
       return "Invalid Date";
     }
+  };
+
+  const formatDuration = (durationMs) => {
+    if (typeof durationMs !== "number") return "N/A";
+    const totalSeconds = Math.floor(durationMs / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}m ${seconds}s`;
   };
 
   if (loading) {
@@ -103,26 +107,30 @@ const RecentLogs = ({ refreshTrigger }) => {
 
       {logs.length === 0 ? (
         <div className="text-center text-gray-500 py-8">
-          No logs found. Press a button to start logging!
+          No logs found. Hold a button to start logging!
         </div>
       ) : (
         <div className="space-y-3 max-h-96 overflow-y-auto">
           {logs.map((log) => (
             <div
               key={log.id}
-              className="flex justify-between items-center p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
+              className="grid grid-cols-3 gap-4 items-center p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors"
             >
-              <div className="flex items-center space-x-3 flex-1">
-                <span className="font-semibold text-chickfila-red">
-                  {log.button_type}
-                </span>
+              <div className="font-semibold text-chickfila-red flex items-center">
+                {log.button_type}
+                {log.auto_released && (
+                  <span className="ml-2 text-xs font-bold rounded px-2 py-1 bg-orange-100 text-orange-700 border border-orange-400">
+                    AUTO
+                  </span>
+                )}
               </div>
-
-              <div className="flex items-center space-x-2">
+              <div className="text-sm font-bold text-gray-800 text-center">
+                {formatDuration(log.duration_ms)}
+              </div>
+              <div className="flex justify-end items-center space-x-4">
                 <span className="text-sm text-gray-600">
-                  {formatTimestamp(log.timestamp)}
+                  {formatTimestamp(log.start_time)}
                 </span>
-
                 <button
                   onClick={() => handleDelete(log.id)}
                   disabled={processingId === log.id}
@@ -138,7 +146,7 @@ const RecentLogs = ({ refreshTrigger }) => {
       )}
 
       <div className="mt-4 text-sm text-gray-500 text-center">
-        Showing last {logs.length} button presses
+        Showing last {logs.length} completed holds
       </div>
     </div>
   );

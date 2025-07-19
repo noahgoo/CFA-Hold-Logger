@@ -8,51 +8,49 @@ import {
   serverTimestamp,
   doc,
   deleteDoc,
-  updateDoc,
 } from "firebase/firestore";
 import { db } from "../firebase/config";
 
-// Collection name for button press logs
-const COLLECTION_NAME = "button_presses";
+const COLLECTION_NAME = "hold_logs";
 
 /**
- * Log a button press to Firestore
- * @param {string} buttonType - The type of button pressed
- * @returns {Promise<Object>} - The created document reference
+ * Logs a completed hold cycle to Firestore.
+ * @param {string} buttonType - The type of item that was held.
+ * @param {string} startTime - The ISO string of when the hold began.
+ * @param {string} endTime - The ISO string of when the hold ended.
+ * @returns {Promise<Object>} - The created document reference.
  */
-export const logButtonPress = async (buttonType) => {
+export const logHold = async (buttonType, startTime, endTime, autoReleased = false) => {
   try {
-    // Create timestamp in Hawaii Standard Time (HST)
-    // Since the user is already in Hawaii, use the current local time
-    const now = new Date();
-    const timestamp = now.toISOString();
+    const holdDuration = new Date(endTime) - new Date(startTime);
 
-    // Add document to Firestore
     const docRef = await addDoc(collection(db, COLLECTION_NAME), {
       button_type: buttonType,
-      timestamp: timestamp,
-      created_at: serverTimestamp(), // Firestore server timestamp as backup
+      start_time: startTime,
+      end_time: endTime,
+      duration_ms: holdDuration, // Duration in milliseconds
+      auto_released: autoReleased, // Flag for auto-release
+      created_at: serverTimestamp(),
     });
 
-    console.log("Button press logged successfully:", docRef.id);
+    console.log("Hold cycle logged successfully:", docRef.id);
     return docRef;
   } catch (error) {
-    console.error("Error logging button press:", error);
+    console.error("Error logging hold cycle:", error);
     throw error;
   }
 };
 
 /**
- * Get recent button press logs
- * @param {number} limitCount - Number of recent logs to retrieve (default: 50)
- * @returns {Promise<Array>} - Array of button press logs
+ * Get recent hold logs.
+ * @param {number} limitCount - Number of recent logs to retrieve.
+ * @returns {Promise<Array>} - Array of hold logs.
  */
 export const getRecentLogs = async (limitCount = 50) => {
   try {
-    // Query Firestore for recent logs, ordered by timestamp descending
     const q = query(
       collection(db, COLLECTION_NAME),
-      orderBy("timestamp", "desc"),
+      orderBy("end_time", "desc"),
       limit(limitCount)
     );
 
@@ -74,46 +72,8 @@ export const getRecentLogs = async (limitCount = 50) => {
 };
 
 /**
- * Get logs for a specific date range
- * @param {Date} startDate - Start date for the range
- * @param {Date} endDate - End date for the range
- * @returns {Promise<Array>} - Array of button press logs in the date range
- */
-export const getLogsByDateRange = async (startDate, endDate) => {
-  try {
-    // Convert dates to ISO strings for comparison
-    const startISO = startDate.toISOString();
-    const endISO = endDate.toISOString();
-
-    // Query Firestore for logs in date range
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      orderBy("timestamp", "desc")
-    );
-
-    const querySnapshot = await getDocs(q);
-    const logs = [];
-
-    querySnapshot.forEach((doc) => {
-      const data = doc.data();
-      if (data.timestamp >= startISO && data.timestamp <= endISO) {
-        logs.push({
-          id: doc.id,
-          ...data,
-        });
-      }
-    });
-
-    return logs;
-  } catch (error) {
-    console.error("Error fetching logs by date range:", error);
-    throw error;
-  }
-};
-
-/**
- * Delete a button press log from Firestore
- * @param {string} logId - The ID of the log to delete
+ * Deletes a log from Firestore.
+ * @param {string} logId - The ID of the log to delete.
  * @returns {Promise<void>}
  */
 export const deleteLog = async (logId) => {
@@ -122,22 +82,6 @@ export const deleteLog = async (logId) => {
     console.log("Log deleted successfully:", logId);
   } catch (error) {
     console.error("Error deleting log:", error);
-    throw error;
-  }
-};
-
-/**
- * Update a button press log in Firestore
- * @param {string} logId - The ID of the log to update
- * @param {Object} updates - The fields to update
- * @returns {Promise<void>}
- */
-export const updateLog = async (logId, updates) => {
-  try {
-    await updateDoc(doc(db, COLLECTION_NAME, logId), updates);
-    console.log("Log updated successfully:", logId);
-  } catch (error) {
-    console.error("Error updating log:", error);
     throw error;
   }
 };
