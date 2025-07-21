@@ -39,18 +39,22 @@ function App() {
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
-      
+
       // Find the first expired hold that is not already being released
-      const expiredHold = Object.entries(activeHolds).find(([buttonType, startTime]) => {
-        const holdDuration = now - new Date(startTime);
-        return holdDuration >= AUTO_RELEASE_DURATION && !releasingHolds[buttonType];
-      });
+      const expiredHold = Object.entries(activeHolds).find(
+        ([buttonType, startTime]) => {
+          const holdDuration = now - new Date(startTime);
+          return (
+            holdDuration >= AUTO_RELEASE_DURATION && !releasingHolds[buttonType]
+          );
+        }
+      );
 
       if (expiredHold) {
         const [buttonType, startTime] = expiredHold;
 
         // Immediately lock the button to prevent reprocessing
-        setReleasingHolds(prev => ({ ...prev, [buttonType]: true }));
+        setReleasingHolds((prev) => ({ ...prev, [buttonType]: true }));
 
         const releaseHold = async () => {
           try {
@@ -70,7 +74,7 @@ function App() {
             console.error(`Failed to auto-release ${buttonType}:`, error);
           } finally {
             // Unlock the button after processing is complete
-            setReleasingHolds(prev => {
+            setReleasingHolds((prev) => {
               const newReleasing = { ...prev };
               delete newReleasing[buttonType];
               return newReleasing;
@@ -124,7 +128,7 @@ function App() {
       <header className="bg-chickfila-red text-chickfila-white py-6 shadow-lg">
         <div className="container mx-auto px-6">
           <h1 className="text-3xl md:text-4xl font-bold text-center">
-            Chick-fil-A Hold Logger
+            Chick-fil-A Hold Tracker
           </h1>
         </div>
       </header>
@@ -193,9 +197,7 @@ function App() {
       {/* Footer */}
       <footer className="bg-gray-800 text-white py-4 mt-12">
         <div className="container mx-auto px-6 text-center">
-          <p className="text-sm opacity-75">
-            Chick-fil-A Hold Logger - Hold Tracking System
-          </p>
+          <p className="text-sm opacity-75">Chick-fil-A Hold Tracker System</p>
         </div>
       </footer>
     </div>

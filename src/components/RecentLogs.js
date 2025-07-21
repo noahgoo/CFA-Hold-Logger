@@ -107,7 +107,7 @@ const RecentLogs = ({ refreshTrigger }) => {
 
       {logs.length === 0 ? (
         <div className="text-center text-gray-500 py-8">
-          No logs found. Hold a button to start logging!
+          No logs found. Press a button to start a 'hold'!
         </div>
       ) : (
         <div className="space-y-3 max-h-96 overflow-y-auto">
