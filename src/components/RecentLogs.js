@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { getRecentLogs, deleteLog } from "../services/firebaseService";
+import {
+  getPaginatedLogs,
+  getTotalLogsCount,
+  deleteLog,
+} from "../services/firebaseService";
 
 const RecentLogs = ({ refreshTrigger }) => {
   const [logs, setLogs] = useState([]);
@@ -7,12 +11,54 @@ const RecentLogs = ({ refreshTrigger }) => {
   const [error, setError] = useState(null);
   const [processingId, setProcessingId] = useState(null);
 
-  const fetchLogs = async () => {
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalLogs, setTotalLogs] = useState(0);
+  const [pageSize] = useState(20);
+  const [lastDoc, setLastDoc] = useState(null);
+  const [pageHistory, setPageHistory] = useState([]); // Store lastDoc for each page
+
+  const fetchLogs = async (page = 1, useHistory = true) => {
     try {
       setLoading(true);
       setError(null);
-      const recentLogs = await getRecentLogs(20);
-      setLogs(recentLogs);
+
+      let targetLastDoc = null;
+
+      if (page === 1) {
+        // First page - no lastDoc needed
+        targetLastDoc = null;
+        setPageHistory([]);
+      } else if (useHistory && pageHistory[page - 2]) {
+        // Use stored lastDoc from history
+        targetLastDoc = pageHistory[page - 2];
+      } else {
+        // Need to navigate from page 1 to target page
+        const result = await getPaginatedLogs(pageSize, null);
+        let currentLastDoc = result.lastDoc;
+        const newHistory = [currentLastDoc];
+
+        for (let i = 2; i < page; i++) {
+          if (currentLastDoc) {
+            const nextResult = await getPaginatedLogs(pageSize, currentLastDoc);
+            currentLastDoc = nextResult.lastDoc;
+            newHistory.push(currentLastDoc);
+          }
+        }
+
+        targetLastDoc = currentLastDoc;
+        setPageHistory(newHistory);
+      }
+
+      const result = await getPaginatedLogs(pageSize, targetLastDoc);
+      setLogs(result.logs);
+      setLastDoc(result.lastDoc);
+
+      // Update page history if needed
+      if (page > 1 && useHistory && !pageHistory[page - 2]) {
+        setPageHistory((prev) => [...prev, targetLastDoc]);
+      }
     } catch (err) {
       console.error("Error fetching logs:", err);
       setError("Failed to load recent logs");
@@ -21,8 +67,19 @@ const RecentLogs = ({ refreshTrigger }) => {
     }
   };
 
+  const fetchTotalCount = async () => {
+    try {
+      const count = await getTotalLogsCount();
+      setTotalLogs(count);
+      setTotalPages(Math.ceil(count / pageSize));
+    } catch (err) {
+      console.error("Error fetching total count:", err);
+    }
+  };
+
   useEffect(() => {
-    fetchLogs();
+    fetchTotalCount();
+    fetchLogs(1, false);
   }, [refreshTrigger]);
 
   const handleDelete = async (logId) => {
@@ -30,13 +87,42 @@ const RecentLogs = ({ refreshTrigger }) => {
       try {
         setProcessingId(logId);
         await deleteLog(logId);
-        await fetchLogs();
+
+        // Refresh total count first
+        await fetchTotalCount();
+
+        // Check if this was the last log on the current page
+        if (logs.length === 1 && currentPage > 1) {
+          // This was the only log on the page, go back to previous page
+          await goToPage(currentPage - 1);
+        } else {
+          // Refresh current page
+          await fetchLogs(currentPage, true);
+        }
       } catch (err) {
         console.error("Error deleting log:", err);
         alert("Failed to delete log");
       } finally {
         setProcessingId(null);
       }
+    }
+  };
+
+  const goToPage = async (page) => {
+    if (page < 1 || page > totalPages || page === currentPage) return;
+    setCurrentPage(page);
+    await fetchLogs(page, true);
+  };
+
+  const goToNextPage = () => {
+    if (currentPage < totalPages) {
+      goToPage(currentPage + 1);
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPage > 1) {
+      goToPage(currentPage - 1);
     }
   };
 
@@ -145,8 +231,65 @@ const RecentLogs = ({ refreshTrigger }) => {
         </div>
       )}
 
+      {/* Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="mt-6 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Page {currentPage} of {totalPages} • {totalLogs} total logs
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={goToPreviousPage}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm font-medium text-chickfila-red hover:text-red-700 disabled:text-gray-400 disabled:cursor-not-allowed border border-gray-300 rounded-md hover:bg-gray-50 disabled:hover:bg-transparent"
+            >
+              ← Previous
+            </button>
+
+            <div className="flex items-center space-x-1">
+              {/* Show page numbers around current page */}
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => goToPage(pageNum)}
+                    className={`px-2 py-1 text-sm font-medium rounded-md ${
+                      currentPage === pageNum
+                        ? "bg-chickfila-red text-white"
+                        : "text-gray-600 hover:text-chickfila-red hover:bg-gray-100"
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={goToNextPage}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 text-sm font-medium text-chickfila-red hover:text-red-700 disabled:text-gray-400 disabled:cursor-not-allowed border border-gray-300 rounded-md hover:bg-gray-50 disabled:hover:bg-transparent"
+            >
+              Next →
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="mt-4 text-sm text-gray-500 text-center">
-        Showing last {logs.length} completed holds
+        Showing {logs.length} logs on page {currentPage} of {totalPages}
       </div>
     </div>
   );
