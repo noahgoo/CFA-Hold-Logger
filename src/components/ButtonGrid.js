@@ -5,6 +5,7 @@ const BREAKFAST_BUTTONS = [
   "Breakfast Filets",
   "Spicy Breakfast Filets",
   "Grilled Breakfast Filets",
+  "Hashbrowns",
 ];
 
 const LUNCH_DINNER_BUTTONS = [
@@ -14,6 +15,7 @@ const LUNCH_DINNER_BUTTONS = [
   "Strips",
   "Grilled Nuggets",
   "Grilled Filets",
+  "Fries",
 ];
 
 const ButtonGrid = ({ onButtonPress, isBreakfastMode, activeHolds }) => {
@@ -35,10 +37,10 @@ const ButtonGrid = ({ onButtonPress, isBreakfastMode, activeHolds }) => {
         const minutes = Math.floor((difference / (1000 * 60)) % 60);
         const seconds = Math.floor((difference / 1000) % 60);
 
-        newElapsedTimes[buttonType] = 
-          `${hours.toString().padStart(2, '0')}:` +
-          `${minutes.toString().padStart(2, '0')}:` +
-          `${seconds.toString().padStart(2, '0')}`;
+        newElapsedTimes[buttonType] =
+          `${hours.toString().padStart(2, "0")}:` +
+          `${minutes.toString().padStart(2, "0")}:` +
+          `${seconds.toString().padStart(2, "0")}`;
       }
       setElapsedTimes(newElapsedTimes);
     }, 1000);

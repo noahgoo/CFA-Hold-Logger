@@ -80,6 +80,7 @@ const RecentLogs = ({ refreshTrigger }) => {
   useEffect(() => {
     fetchTotalCount();
     fetchLogs(1, false);
+    setCurrentPage(1); // Reset to first page when refreshing
   }, [refreshTrigger]);
 
   const handleDelete = async (logId) => {
@@ -184,7 +185,11 @@ const RecentLogs = ({ refreshTrigger }) => {
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-2xl font-bold text-gray-800">Recent Logs</h2>
         <button
-          onClick={fetchLogs}
+          onClick={() => {
+            setCurrentPage(1);
+            setPageHistory([]);
+            fetchLogs(1, false);
+          }}
           className="text-chickfila-red hover:text-red-700 font-medium"
         >
           Refresh
