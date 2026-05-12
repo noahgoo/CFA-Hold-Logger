@@ -17,6 +17,7 @@ import {
   isoWeekBounds,
   hawaiiToday,
   hawaiiCurrentWeek,
+  hawaiiHour,
   hawaiiDayOfWeek,
 } from "../services/analyticsService";
 import "../App.css";
@@ -56,13 +57,6 @@ const axisStyle = {
 };
 
 // ── Helpers ───────────────────────────────────────────────
-const hawaiiMinutes = (isoString) => {
-  const local = new Date(
-    new Date(isoString).toLocaleString("en-US", { timeZone: "Pacific/Honolulu" })
-  );
-  return local.getHours() * 60 + local.getMinutes();
-};
-
 const fmtTime = (isoString) =>
   new Date(isoString).toLocaleTimeString("en-US", {
     timeZone: "Pacific/Honolulu",
@@ -71,11 +65,10 @@ const fmtTime = (isoString) =>
     hour12: true,
   });
 
-const fmtHour = (mins) => {
-  const h = Math.floor(mins / 60);
-  if (h === 0) return "12am";
-  if (h === 12) return "12pm";
-  return h < 12 ? `${h}am` : `${h - 12}pm`;
+const fmtHourLabel = (h) => {
+  if (h === 0) return "12a";
+  if (h === 12) return "12p";
+  return h < 12 ? `${h}a` : `${h - 12}p`;
 };
 
 const fmtWeekLabel = (weekStart) => {
@@ -87,97 +80,109 @@ const fmtWeekLabel = (weekStart) => {
   return `${fmt(weekStart)} – ${fmt(end)}`;
 };
 
-// ── Dot Timeline ──────────────────────────────────────────
-const DotTimeline = ({ logs }) => {
-  const [activeDot, setActiveDot] = useState(null);
+// ── Heatmap Grid ─────────────────────────────────────────
+const cellColor = (count) => {
+  if (count === 0) return "transparent";
+  if (count >= 5)  return "#f59e0b";                 // amber  — 5+
+  if (count >= 4)  return "#e60e33";                 // red    — 4
+  if (count >= 3)  return "rgba(230,14,51,0.75)";   //         — 3
+  if (count >= 2)  return "rgba(230,14,51,0.5)";    //         — 2
+  return "rgba(230,14,51,0.28)";                     // dim    — 1
+};
+
+const HeatmapGrid = ({ logs }) => {
+  const [activeCell, setActiveCell] = useState(null);
 
   if (logs.length === 0) return <p className="logs-empty">no holds logged for this date</p>;
 
   const activeProteins = ALL_PROTEINS.filter((p) => logs.some((l) => l.button_type === p));
-  const allMins = logs.map((l) => hawaiiMinutes(l.start_time));
-  const rawMin = Math.min(...allMins);
-  const rawMax = Math.max(...allMins);
 
-  const startMin = Math.max(0, Math.floor(rawMin / 60) * 60 - 30);
-  const endMin = Math.min(1439, Math.ceil(rawMax / 60) * 60 + 30);
-  const range = endMin - startMin || 1;
+  const hours = Array.from({ length: 17 }, (_, i) => i + 6); // 6am–10pm fixed
 
-  const toPct = (mins) => `${((mins - startMin) / range) * 100}%`;
-  const colWidthPct = `${(60 / range) * 100}%`;
+  // Build cell data
+  const cells = {};
+  for (const p of activeProteins) {
+    for (const h of hours) {
+      const matching = logs
+        .filter((l) => l.button_type === p && hawaiiHour(l.start_time) === h)
+        .sort((a, b) => a.start_time.localeCompare(b.start_time));
+      cells[`${p}-${h}`] = { count: matching.length, times: matching.map((l) => fmtTime(l.start_time)) };
+    }
+  }
 
-  const ticks = [];
-  for (let m = Math.ceil(startMin / 60) * 60; m <= endMin; m += 60) ticks.push(m);
-
-  const handleDot = (e, log) => {
+  const handleCell = (e, protein, hour) => {
     e.stopPropagation();
-    const key = `${log.button_type}-${log.start_time}`;
-    setActiveDot((prev) => (prev?.key === key ? null : { key, protein: log.button_type, time: fmtTime(log.start_time) }));
+    const cell = cells[`${protein}-${hour}`];
+    if (!cell?.count) return;
+    const key = `${protein}-${hour}`;
+    setActiveCell((prev) => (prev?.key === key ? null : { key, protein, hour, ...cell }));
   };
 
   return (
-    <div className="dt-wrap" onClick={() => setActiveDot(null)}>
-      {/* Tap info bar */}
-      <div className={`dt-info ${activeDot ? "visible" : ""}`}>
-        {activeDot && (
+    <div className="hm-wrap" onClick={() => setActiveCell(null)}>
+      {/* Info bar */}
+      <div className={`dt-info ${activeCell ? "visible" : ""}`}>
+        {activeCell && (
           <>
-            <span className="dt-info-protein">{activeDot.protein}</span>
+            <span className="dt-info-protein">{activeCell.protein}</span>
             <span className="dt-info-sep">·</span>
-            <span className="dt-info-time">{activeDot.time}</span>
+            <span className="dt-info-time" style={{ color: "var(--text-muted)" }}>
+              {fmtHourLabel(activeCell.hour)}–{fmtHourLabel(activeCell.hour + 1)}
+            </span>
+            <span className="dt-info-sep">·</span>
+            <span className="dt-info-time">{activeCell.times.join("  ·  ")}</span>
           </>
         )}
       </div>
 
-      {/* Lanes */}
-      {activeProteins.map((p) => {
-        const count = logs.filter((l) => l.button_type === p).length;
-        return (
-          <div key={p} className="dt-row">
-            {/* Label + count */}
-            <div className="dt-label">
-              <span className="dt-label-name">{p}</span>
-              <span className="dt-count">{count}</span>
-            </div>
+      {/* Column headers */}
+      <div className="hm-header">
+        <div className="hm-label-col" />
+        {hours.map((h) => (
+          <div key={h} className="hm-cell-col hm-hour-label">{fmtHourLabel(h)}</div>
+        ))}
+        <div className="hm-total-col hm-col-label">ALL</div>
+      </div>
 
-            {/* Track */}
-            <div className="dt-track">
-              {/* Alternating column fills */}
-              {ticks.slice(0, -1).map((m, i) => (
-                <div
-                  key={m}
-                  className={`dt-col-fill ${i % 2 === 1 ? "alt" : ""}`}
-                  style={{ left: toPct(m), width: colWidthPct }}
-                />
-              ))}
-              {/* Hour grid lines */}
-              {ticks.map((m) => (
-                <div key={m} className="dt-gridline" style={{ left: toPct(m) }} />
-              ))}
-              {/* Dots */}
-              {logs.filter((l) => l.button_type === p).map((log, i) => {
-                const key = `${log.button_type}-${log.start_time}`;
-                return (
+      {/* Protein rows */}
+      {activeProteins.map((p) => {
+        const total = logs.filter((l) => l.button_type === p).length;
+        return (
+          <div key={p} className="hm-row">
+            <div className="hm-label-col hm-protein-label">{p}</div>
+            {hours.map((h) => {
+              const key = `${p}-${h}`;
+              const cell = cells[key];
+              const isActive = activeCell?.key === key;
+              return (
+                <div key={h} className="hm-cell-col">
                   <button
-                    key={i}
-                    className={`dt-dot ${activeDot?.key === key ? "active" : ""}`}
-                    style={{ left: toPct(hawaiiMinutes(log.start_time)) }}
-                    onClick={(e) => handleDot(e, log)}
-                    aria-label={`${p} at ${fmtTime(log.start_time)}`}
-                  />
-                );
-              })}
-            </div>
+                    className={`hm-cell ${cell.count > 0 ? "has-data" : ""} ${isActive ? "active" : ""}`}
+                    style={{ background: cellColor(cell.count) }}
+                    onClick={(e) => handleCell(e, p, h)}
+                    disabled={cell.count === 0}
+                  >
+                    {cell.count > 0 && <span className="hm-cell-num">{cell.count}</span>}
+                  </button>
+                </div>
+              );
+            })}
+            <div className="hm-total-col hm-total-val">{total}</div>
           </div>
         );
       })}
 
-      {/* X axis */}
-      <div className="dt-axis">
-        <div className="dt-axis-track">
-          {ticks.map((m) => (
-            <span key={m} className="dt-tick" style={{ left: toPct(m) }}>
-              {fmtHour(m)}
-            </span>
-          ))}
+      {/* Hour totals footer */}
+      <div className="hm-row hm-footer-row">
+        <div className="hm-label-col hm-footer-label">TOTAL</div>
+        {hours.map((h) => {
+          const n = logs.filter((l) => hawaiiHour(l.start_time) === h).length;
+          return (
+            <div key={h} className="hm-cell-col hm-hour-total">{n || ""}</div>
+          );
+        })}
+        <div className="hm-total-col hm-total-val" style={{ color: AMBER, fontWeight: 700 }}>
+          {logs.length}
         </div>
       </div>
     </div>
@@ -301,7 +306,7 @@ export default function Analytics() {
         {dailyLoading ? (
           <div className="loading-wrap"><div className="loading-spinner" /></div>
         ) : (
-          <DotTimeline logs={dailyLogs} />
+          <HeatmapGrid logs={dailyLogs} />
         )}
       </Section>
 
