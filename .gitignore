@@ -38,3 +38,5 @@ firestore-debug.log
 Thumbs.db 
 
 .cursorrules
+AGENTS.md
+.playwright-mcp/
