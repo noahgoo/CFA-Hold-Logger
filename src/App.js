@@ -58,8 +58,9 @@ function App() {
 
         const releaseHold = async () => {
           try {
-            // Log the auto-released hold to Firebase
-            await logHold(buttonType, startTime, now.toISOString(), true);
+            // Clamp end time to startTime + 15min (app may have been closed/reopened)
+            const autoReleaseTime = new Date(new Date(startTime).getTime() + AUTO_RELEASE_DURATION);
+            await logHold(buttonType, startTime, autoReleaseTime.toISOString(), true);
 
             // Remove the hold from the active holds state
             setActiveHolds((prev) => {
