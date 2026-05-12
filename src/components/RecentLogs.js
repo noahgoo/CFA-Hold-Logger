@@ -16,7 +16,6 @@ const RecentLogs = ({ refreshTrigger }) => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
   const [pageSize] = useState(20);
-  const [lastDoc, setLastDoc] = useState(null);
   const [pageHistory, setPageHistory] = useState([]); // Store lastDoc for each page
 
   const fetchLogs = async (page = 1, useHistory = true) => {
@@ -53,7 +52,6 @@ const RecentLogs = ({ refreshTrigger }) => {
 
       const result = await getPaginatedLogs(pageSize, targetLastDoc);
       setLogs(result.logs);
-      setLastDoc(result.lastDoc);
 
       // Update page history if needed
       if (page > 1 && useHistory && !pageHistory[page - 2]) {
@@ -80,7 +78,8 @@ const RecentLogs = ({ refreshTrigger }) => {
   useEffect(() => {
     fetchTotalCount();
     fetchLogs(1, false);
-    setCurrentPage(1); // Reset to first page when refreshing
+    setCurrentPage(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [refreshTrigger]);
 
   const handleDelete = async (logId) => {
