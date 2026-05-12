@@ -110,12 +110,6 @@ const RecentLogs = ({ refreshTrigger }) => {
     }
   };
 
-  const formatDuration = (ms) => {
-    if (typeof ms !== "number") return "—";
-    const m = Math.floor(ms / 60000);
-    const s = Math.floor((ms % 60000) / 1000);
-    return `${m}m ${s}s`;
-  };
 
   const pageNums = (() => {
     const total = Math.min(5, totalPages);
@@ -168,11 +162,7 @@ const RecentLogs = ({ refreshTrigger }) => {
         <div className="logs-scroll">
           {logs.map((log) => (
             <div key={log.id} className="log-row">
-              <span className="log-item">
-                {log.button_type}
-                {log.auto_released && <span className="auto-badge">AUTO</span>}
-              </span>
-              <span className="log-duration">{formatDuration(log.duration_ms)}</span>
+              <span className="log-item">{log.button_type}</span>
               <span className="log-time">{formatTime(log.start_time)}</span>
               <button
                 className="log-delete"
