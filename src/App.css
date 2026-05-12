@@ -751,6 +751,33 @@ body {
   color: #333;
 }
 
+/* ── Heatmap mobile scroll ── */
+@media (max-width: 640px) {
+  .hm-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hm-header,
+  .hm-row {
+    min-width: 580px;
+  }
+
+  .hm-label-col {
+    position: sticky;
+    left: 0;
+    background: var(--bg);
+    z-index: 2;
+  }
+
+  .hm-total-col {
+    position: sticky;
+    right: 0;
+    background: var(--bg);
+    z-index: 2;
+  }
+}
+
 /* ── Dot Timeline (kept for reference) ── */
 .dt-wrap {
   padding: 4px 0 0;
