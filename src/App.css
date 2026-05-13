@@ -766,15 +766,19 @@ body {
   .hm-label-col {
     position: sticky;
     left: 0;
-    background: var(--bg);
+    background: #0d0d0d;
     z-index: 2;
+    transform: translateZ(0);
+    border-right: 1px solid #1e1e1e;
   }
 
   .hm-total-col {
     position: sticky;
     right: 0;
-    background: var(--bg);
+    background: #0d0d0d;
     z-index: 2;
+    transform: translateZ(0);
+    border-left: 1px solid #1e1e1e;
   }
 }
 
