@@ -181,7 +181,7 @@ body {
 }
 
 .hold-btn.flashing {
-  animation: btnFlash 0.4s ease-out forwards;
+  animation: btnFlash 3s ease-out forwards;
 }
 
 @keyframes btnFlash {
@@ -190,7 +190,12 @@ body {
     border-color: var(--red);
     box-shadow: 8px 8px 20px var(--shadow-dark), -3px -3px 10px #1a0408, 0 0 40px rgba(230, 14, 51, 0.5);
   }
-  60%  {
+  30%  {
+    background: var(--red);
+    border-color: var(--red);
+    box-shadow: 8px 8px 20px var(--shadow-dark), -3px -3px 10px #1a0408, 0 0 40px rgba(230, 14, 51, 0.5);
+  }
+  80%  {
     background: linear-gradient(145deg, #2a0a12, #1a0509);
     border-color: rgba(230, 14, 51, 0.4);
   }

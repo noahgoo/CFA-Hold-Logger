@@ -32,7 +32,7 @@ const ButtonGrid = ({ onButtonPress, isBreakfastMode }) => {
         delete next[type];
         return next;
       });
-    }, 400);
+    }, 3000);
   };
 
   return (
