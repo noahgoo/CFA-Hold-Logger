@@ -18,9 +18,12 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "start:emulator": "REACT_APP_USE_EMULATOR=true react-scripts start",
     "build": "CI=false react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "emulator": "firebase emulators:start --only firestore",
+    "seed:emulator": "node seed-emulator.mjs"
   },
   "eslintConfig": {
     "extends": [
