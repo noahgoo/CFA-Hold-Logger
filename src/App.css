@@ -1085,3 +1085,84 @@ body {
   z-index: 100 !important;
 }
 
+/* ── Multi-Week Heatmap ─────────────────────────── */
+.mw-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mw-grid {
+  display: grid;
+  grid-template-columns: 80px repeat(var(--mw-cols), minmax(44px, 1fr));
+  gap: 4px;
+  min-width: calc(80px + var(--mw-cols) * 48px);
+}
+
+.mw-col-header {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  color: #555;
+  padding-bottom: 6px;
+  line-height: 1.3;
+}
+
+.mw-day-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 0.75rem;
+  color: #555;
+  display: flex;
+  align-items: center;
+  height: 36px;
+}
+
+.mw-cell {
+  height: 36px;
+  border-radius: 5px;
+  border: none;
+  background: transparent;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s;
+  width: 100%;
+}
+
+.mw-cell.has-data { cursor: pointer; }
+.mw-cell.has-data:hover { transform: scale(1.07); z-index: 1; }
+.mw-cell.selected { box-shadow: 0 0 0 2px #f59e0b; z-index: 2; }
+
+.mw-cell-num {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.85);
+  pointer-events: none;
+}
+
+.an-nav-btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  color: #555;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s;
+  line-height: 1;
+}
+
+.an-nav-btn:hover:not(:disabled) { color: #e0e0e0; border-color: #444; }
+.an-nav-btn:disabled { opacity: 0.35; cursor: default; }
+
+@media (max-width: 640px) {
+  .mw-day-label {
+    position: sticky;
+    left: 0;
+    background: #0a0a0a;
+    z-index: 2;
+  }
+}
+

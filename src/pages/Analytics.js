@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import {
@@ -19,6 +19,9 @@ import {
   hawaiiCurrentWeek,
   hawaiiHour,
   hawaiiDayOfWeek,
+  hawaiiDateString,
+  shiftISOWeek,
+  getMultiWeekRangeBounds,
 } from "../services/analyticsService";
 import "../App.css";
 
@@ -36,7 +39,7 @@ const ALL_PROTEINS = [
   "Hashbrowns",
 ];
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const RED = "#e60e33";
 const AMBER = "#f59e0b";
 const DIM = "#3a3a3a";
@@ -78,6 +81,78 @@ const fmtWeekLabel = (weekStart) => {
   const fmt = (d) =>
     d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric", year: "numeric" });
   return `${fmt(weekStart)} – ${fmt(end)}`;
+};
+
+// ── Multi-Week Heatmap ────────────────────────────────────
+const MW_DAYS = ["MON", "TUE", "WED", "THU", "FRI", "SAT"];
+
+const mwCellColor = (count, max) => {
+  if (!count) return "transparent";
+  const r = count / max;
+  if (r >= 1)    return "#f59e0b";
+  if (r >= 0.75) return "#e60e33";
+  if (r >= 0.5)  return "rgba(230,14,51,0.75)";
+  if (r >= 0.25) return "rgba(230,14,51,0.5)";
+  return "rgba(230,14,51,0.28)";
+};
+
+const fmtShortRange = (weekStart) => {
+  const sat = new Date(weekStart.getTime() + 5 * 86400000);
+  const fmt = (d) => d.toLocaleDateString("en-US", { timeZone: "UTC", month: "short", day: "numeric" });
+  return `${fmt(weekStart)}–${fmt(sat)}`;
+};
+
+const MultiWeekHeatmap = ({ logs, numWeeks, endYear, endWeek, protein, dailyDateStr, onDayClick }) => {
+  const filtered = protein === "All" ? logs : logs.filter((l) => l.button_type === protein);
+
+  const countMap = {};
+  filtered.forEach((l) => {
+    const d = hawaiiDateString(l.start_time);
+    countMap[d] = (countMap[d] ?? 0) + 1;
+  });
+
+  const weekRows = [];
+  for (let i = -(numWeeks - 1); i <= 0; i++) {
+    const { year: y, week: w } = shiftISOWeek(endYear, endWeek, i);
+    const { weekStart } = isoWeekBounds(y, w);
+    const cells = MW_DAYS.map((_, dayIdx) => {
+      const dateStr = new Date(weekStart.getTime() + dayIdx * 86400000)
+        .toISOString()
+        .slice(0, 10);
+      return { dateStr, count: countMap[dateStr] ?? 0 };
+    });
+    weekRows.push({ label: fmtShortRange(weekStart), cells });
+  }
+
+  const allCounts = weekRows.flatMap((r) => r.cells.map((c) => c.count));
+  const maxCount = Math.max(1, ...allCounts);
+
+  return (
+    <div className="mw-scroll">
+      <div className="mw-grid" style={{ "--mw-cols": MW_DAYS.length }}>
+        <div />
+        {MW_DAYS.map((d) => (
+          <div key={d} className="mw-col-header">{d}</div>
+        ))}
+        {weekRows.map(({ label, cells }, wi) => (
+          <React.Fragment key={wi}>
+            <div className="mw-day-label" style={{ fontSize: "0.6rem" }}>{label}</div>
+            {cells.map(({ dateStr, count }, di) => (
+              <button
+                key={di}
+                className={`mw-cell${count ? " has-data" : ""}${count && dateStr === dailyDateStr ? " selected" : ""}`}
+                style={{ backgroundColor: mwCellColor(count, maxCount) }}
+                disabled={!count}
+                onClick={() => onDayClick(dateStr)}
+              >
+                {count > 0 && <span className="mw-cell-num">{count}</span>}
+              </button>
+            ))}
+          </React.Fragment>
+        ))}
+      </div>
+    </div>
+  );
 };
 
 // ── Heatmap Grid ─────────────────────────────────────────
@@ -189,6 +264,32 @@ const HeatmapGrid = ({ logs }) => {
   );
 };
 
+// ── Animated height wrapper ───────────────────────────────
+const AnimatedHeight = ({ children, style }) => {
+  const innerRef = useRef(null);
+  const [height, setHeight] = useState(null);
+
+  useEffect(() => {
+    if (!innerRef.current) return;
+    const ro = new ResizeObserver((entries) => {
+      setHeight(entries[0].contentRect.height);
+    });
+    ro.observe(innerRef.current);
+    return () => ro.disconnect();
+  }, []);
+
+  return (
+    <div style={{
+      height: height !== null ? height : "auto",
+      overflow: "hidden",
+      transition: "height 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+      ...style,
+    }}>
+      <div ref={innerRef}>{children}</div>
+    </div>
+  );
+};
+
 // ── Section wrapper ───────────────────────────────────────
 const Section = ({ title, children, controls }) => (
   <div className="an-section">
@@ -219,6 +320,7 @@ export default function Analytics() {
   const [dailyDate, setDailyDate] = useState(todayDate);
   const [dailyLogs, setDailyLogs] = useState([]);
   const [dailyLoading, setDailyLoading] = useState(false);
+  const prevDailyLogsRef = useRef([]);
 
   const [weekYear, setWeekYear] = useState(curYear);
   const [weekNum, setWeekNum] = useState(curWeek);
@@ -226,6 +328,15 @@ export default function Analytics() {
   const [weeklyLoading, setWeeklyLoading] = useState(false);
   const [weekLabel, setWeekLabel] = useState("");
   const [weekProtein, setWeekProtein] = useState("All");
+
+  const [mwNumWeeks, setMwNumWeeks] = useState(4);
+  const [mwEndYear, setMwEndYear] = useState(curYear);
+  const [mwEndWeek, setMwEndWeek] = useState(curWeek);
+  const [mwLogs, setMwLogs] = useState([]);
+  const [mwLoading, setMwLoading] = useState(false);
+  const [mwProtein, setMwProtein] = useState("All");
+
+  const dailySectionRef = useRef(null);
 
   const dateToStr = (d) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -243,6 +354,7 @@ export default function Analytics() {
   }, []);
 
   useEffect(() => { fetchDaily(dailyDate); }, [dailyDate, fetchDaily]);
+  useEffect(() => { if (dailyLogs.length > 0) prevDailyLogsRef.current = dailyLogs; }, [dailyLogs]);
 
   const fetchWeekly = useCallback(async (year, week) => {
     setWeeklyLoading(true);
@@ -258,6 +370,26 @@ export default function Analytics() {
   }, []);
 
   useEffect(() => { fetchWeekly(weekYear, weekNum); }, [weekYear, weekNum, fetchWeekly]);
+
+  const fetchMultiWeek = useCallback(async (endYear, endWeek, numWeeks) => {
+    setMwLoading(true);
+    try {
+      const { startISO, endISO } = getMultiWeekRangeBounds(endYear, endWeek, numWeeks);
+      setMwLogs(await getLogsForDateRange(startISO, endISO));
+    } catch (e) {
+      console.error("Multi-week fetch failed:", e);
+    } finally {
+      setMwLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchMultiWeek(mwEndYear, mwEndWeek, mwNumWeeks); },
+    [mwEndYear, mwEndWeek, mwNumWeeks, fetchMultiWeek]);
+
+  const handleMwDayClick = useCallback((dateStr) => {
+    setDailyDate(new Date(dateStr + "T12:00:00"));
+    dailySectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   // Weekly holds per day
   const filteredWeekly = weekProtein === "All"
@@ -281,32 +413,89 @@ export default function Analytics() {
       </header>
 
       {/* ── Daily Hold Timeline ── */}
+      <div ref={dailySectionRef}>
+        <Section
+          title="HOLD TIMELINE"
+          controls={
+            <div className="an-control-row">
+              <label className="an-label">DATE</label>
+              <DatePicker
+                selected={dailyDate}
+                onChange={(d) => d && setDailyDate(d)}
+                maxDate={todayDate}
+                dateFormat="MMM d, yyyy"
+                className="an-input an-datepicker"
+                calendarClassName="an-calendar"
+                popperPlacement="bottom-end"
+              />
+              {dateToStr(dailyDate) !== todayStr && (
+                <button className="an-today-btn" onClick={() => setDailyDate(todayDate)}>
+                  today
+                </button>
+              )}
+            </div>
+          }
+        >
+          <AnimatedHeight style={{ opacity: dailyLoading ? 0.4 : 1, transition: "height 0.3s cubic-bezier(0.4,0,0.2,1), opacity 0.15s" }}>
+            {dailyLogs.length === 0 && prevDailyLogsRef.current.length > 0 ? (
+              <div style={{ position: "relative" }}>
+                <div style={{ visibility: "hidden" }}>
+                  <HeatmapGrid logs={prevDailyLogsRef.current} />
+                </div>
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <p className="logs-empty">no holds logged for this date</p>
+                </div>
+              </div>
+            ) : (
+              <HeatmapGrid logs={dailyLogs} />
+            )}
+          </AnimatedHeight>
+        </Section>
+      </div>
+
+      {/* ── Multi-Week Overview ── */}
       <Section
-        title="HOLD TIMELINE"
+        title="MULTI-WEEK OVERVIEW"
         controls={
-          <div className="an-control-row">
-            <label className="an-label">DATE</label>
-            <DatePicker
-              selected={dailyDate}
-              onChange={(d) => d && setDailyDate(d)}
-              maxDate={todayDate}
-              dateFormat="MMM d, yyyy"
-              className="an-input an-datepicker"
-              calendarClassName="an-calendar"
-              popperPlacement="bottom-end"
-            />
-            {dateToStr(dailyDate) !== todayStr && (
-              <button className="an-today-btn" onClick={() => setDailyDate(todayDate)}>
-                today
+          <div className="an-control-row" style={{ gap: 8, flexWrap: "wrap" }}>
+            <label className="an-label">WEEKS</label>
+            <select className="an-input" value={mwNumWeeks} onChange={(e) => setMwNumWeeks(Number(e.target.value))}>
+              {[2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+            <button
+              className="an-nav-btn"
+              onClick={() => { const s = shiftISOWeek(mwEndYear, mwEndWeek, -1); setMwEndYear(s.year); setMwEndWeek(s.week); }}
+            >‹</button>
+            <button
+              className="an-nav-btn"
+              disabled={mwEndYear === curYear && mwEndWeek === curWeek}
+              onClick={() => { const s = shiftISOWeek(mwEndYear, mwEndWeek, 1); setMwEndYear(s.year); setMwEndWeek(s.week); }}
+            >›</button>
+            {(mwEndYear !== curYear || mwEndWeek !== curWeek) && (
+              <button className="an-today-btn" onClick={() => { setMwEndYear(curYear); setMwEndWeek(curWeek); }}>
+                now
               </button>
             )}
+            <label className="an-label" style={{ marginLeft: 4 }}>PROTEIN</label>
+            <select className="an-input" value={mwProtein} onChange={(e) => setMwProtein(e.target.value)}>
+              <option value="All">All</option>
+              {ALL_PROTEINS.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
           </div>
         }
       >
-        {dailyLoading ? (
+        {mwLoading ? (
           <div className="loading-wrap"><div className="loading-spinner" /></div>
         ) : (
-          <HeatmapGrid logs={dailyLogs} />
+          <MultiWeekHeatmap
+            logs={mwLogs}
+            numWeeks={mwNumWeeks}
+            endYear={mwEndYear}
+            endWeek={mwEndWeek}
+            protein={mwProtein}
+            dailyDateStr={dateToStr(dailyDate)}
+            onDayClick={handleMwDayClick}
+          />
         )}
       </Section>
 
@@ -339,9 +528,7 @@ export default function Analytics() {
           </div>
         }
       >
-        {weeklyLoading ? (
-          <div className="loading-wrap"><div className="loading-spinner" /></div>
-        ) : (
+        <div style={{ opacity: weeklyLoading ? 0.4 : 1, transition: "opacity 0.15s" }}>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={dayCounts} style={chartStyle} margin={{ top: 8, right: 12, left: -10, bottom: 8 }}>
               <CartesianGrid vertical={false} stroke="#1f1f1f" />
@@ -353,7 +540,7 @@ export default function Analytics() {
               </Bar>
             </BarChart>
           </ResponsiveContainer>
-        )}
+        </div>
       </Section>
 
       <div style={{ height: 40 }} />

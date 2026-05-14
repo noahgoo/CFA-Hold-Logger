@@ -73,6 +73,42 @@ export const hawaiiHour = (isoString) => {
   );
 };
 
+// Returns YYYY-MM-DD calendar date in Hawaii time from an ISO string
+export const hawaiiDateString = (isoString) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Honolulu" }).format(new Date(isoString));
+
+// Shifts an ISO week by delta weeks; handles year-boundary wraparound
+export const shiftISOWeek = (year, week, delta) => {
+  const { weekStart } = isoWeekBounds(year, week);
+  const newMon = new Date(weekStart.getTime() + delta * 7 * 86400000);
+  const y = newMon.getUTCFullYear();
+  const jan4 = new Date(Date.UTC(y, 0, 4));
+  const dow = (jan4.getUTCDay() + 6) % 7;
+  const week1Mon = new Date(Date.UTC(y, 0, 4 - dow));
+  const diff = newMon - week1Mon;
+  const w = Math.floor(diff / (7 * 86400000)) + 1;
+  if (w < 1) {
+    const yp = y - 1;
+    const jan4p = new Date(Date.UTC(yp, 0, 4));
+    const dowp = (jan4p.getUTCDay() + 6) % 7;
+    const wk1p = new Date(Date.UTC(yp, 0, 4 - dowp));
+    return { year: yp, week: Math.floor((newMon - wk1p) / (7 * 86400000)) + 1 };
+  }
+  const jan4n = new Date(Date.UTC(y + 1, 0, 4));
+  const down = (jan4n.getUTCDay() + 6) % 7;
+  const wk1n = new Date(Date.UTC(y + 1, 0, 4 - down));
+  if (newMon >= wk1n) return { year: y + 1, week: 1 };
+  return { year: y, week: w };
+};
+
+// Returns UTC ISO start/end covering numWeeks consecutive weeks ending at (endYear, endWeek)
+export const getMultiWeekRangeBounds = (endYear, endWeek, numWeeks) => {
+  const { year: sy, week: sw } = shiftISOWeek(endYear, endWeek, -(numWeeks - 1));
+  const { start } = isoWeekBounds(sy, sw);
+  const { end } = isoWeekBounds(endYear, endWeek);
+  return { startISO: start, endISO: end };
+};
+
 // Returns day of week index 0=Mon in Hawaii time from an ISO string
 export const hawaiiDayOfWeek = (isoString) => {
   const date = new Date(isoString);
