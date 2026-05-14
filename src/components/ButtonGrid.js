@@ -41,7 +41,7 @@ const ButtonGrid = ({ onButtonPress, isBreakfastMode }) => {
         <button
           key={type}
           onClick={() => handlePress(type)}
-          className={`hold-btn ${flashing[type] ? "flashing" : ""}`}
+          className={`hold-btn ${isBreakfastMode ? "breakfast" : ""} ${flashing[type] ? "flashing" : ""}`}
         >
           <span className="btn-label">{type}</span>
         </button>
