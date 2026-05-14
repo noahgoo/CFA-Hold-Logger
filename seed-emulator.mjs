@@ -1,32 +1,112 @@
-// seed-emulator.mjs — Seeds 30 days of hold_logs into the local Firestore emulator
+// seed-emulator.mjs — Seeds 3 months of hold_logs into the local Firestore emulator
 // Run with: node seed-emulator.mjs
 // Requires: firebase emulators:start --only firestore
+//
+// Trends baked in (dow: 0=Sun..6=Sat):
+//   Sun      — closed (Chick-fil-A)
+//   Mon (1)  — evening surge (5-9pm dominates)
+//   Tue (2)  — Nuggets Tuesday (~70% Nuggets/Grilled Nuggets)
+//   Wed (3)  — 11am-2pm lunch crush (~65% of volume)
+//   Thu (4)  — Spicy Thursday (Spicy Filets ~35%)
+//   Fri (5)  — busiest weekday, balanced mix
+//   Sat (6)  — busiest day overall, strong morning + lunch
 
 const PROJECT_ID = "cfa-hold-logger";
 const BASE_URL = `http://127.0.0.1:8080/v1/projects/${PROJECT_ID}/databases/(default)/documents/hold_logs`;
 
-const PRODUCTS = [
-  "Nuggets",
-  "Filets",
-  "Strips",
-  "Grilled Filets",
-  "Spicy Filets",
-  "Grilled Nuggets",
-  "Fries",
-];
+// Log count ranges [lo, hi] per day of week
+const COUNT_RANGE = {
+  1: [12, 22],  // Mon — slow
+  2: [18, 28],  // Tue — Nuggets day
+  3: [18, 28],  // Wed — lunch crush
+  4: [20, 32],  // Thu — Spicy day
+  5: [30, 45],  // Fri — busy
+  6: [42, 58],  // Sat — busiest
+};
 
-// Traffic windows: [startHour, endHour, weight]
-const TRAFFIC_WINDOWS = [
-  [6, 8, 1],
-  [7, 9, 3],
-  [11, 13, 4],
-  [14, 16, 1.5],
-  [17, 21, 2],
-];
-const TOTAL_WEIGHT = TRAFFIC_WINDOWS.reduce((s, [, , w]) => s + w, 0);
+// Product weight tables [name, weight] per dow (fall back to "default")
+const PRODUCT_TABLES = {
+  default: [
+    ["Nuggets", 3],
+    ["Filets", 2.5],
+    ["Strips", 1.5],
+    ["Grilled Filets", 1.5],
+    ["Spicy Filets", 1],
+    ["Grilled Nuggets", 1],
+    ["Fries", 0.5],
+  ],
+  2: [ // Tuesday: Nuggets dominate
+    ["Nuggets", 8],
+    ["Grilled Nuggets", 3],
+    ["Filets", 1],
+    ["Strips", 0.5],
+    ["Grilled Filets", 0.5],
+    ["Spicy Filets", 0.2],
+    ["Fries", 0.2],
+  ],
+  4: [ // Thursday: Spicy Filets spike
+    ["Nuggets", 2],
+    ["Filets", 2],
+    ["Strips", 1.5],
+    ["Grilled Filets", 1],
+    ["Spicy Filets", 5],
+    ["Grilled Nuggets", 1],
+    ["Fries", 0.5],
+  ],
+};
+
+// Traffic window tables [startH, endH, weight] per dow
+const TRAFFIC_TABLES = {
+  default: [
+    [6, 8, 1],
+    [7, 9, 3],
+    [11, 13, 4],
+    [14, 16, 1.5],
+    [17, 21, 2],
+  ],
+  1: [ // Monday: evening dominant
+    [6, 8, 0.5],
+    [7, 9, 1],
+    [11, 13, 2],
+    [14, 16, 2],
+    [17, 21, 5],
+  ],
+  3: [ // Wednesday: 11am-2pm crush
+    [6, 8, 0.3],
+    [7, 9, 0.5],
+    [11, 14, 9],
+    [14, 16, 0.5],
+    [17, 21, 0.7],
+  ],
+  6: [ // Saturday: all-day volume, big morning + lunch
+    [7, 9, 5],
+    [9, 11, 2],
+    [11, 14, 6],
+    [14, 17, 3],
+    [17, 21, 3],
+  ],
+};
+
+const DAY_NOTES = {
+  1: "evening surge",
+  2: "Nuggets Tuesday",
+  3: "11am-2pm lunch crush",
+  4: "Spicy Thursday",
+  5: "busy Friday",
+  6: "Saturday rush",
+};
 
 const rand = (lo, hi) => lo + Math.floor(Math.random() * (hi - lo + 1));
-const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+function weightedPick(table) {
+  const total = table.reduce((s, [, w]) => s + w, 0);
+  let r = Math.random() * total;
+  for (const [item, w] of table) {
+    r -= w;
+    if (r <= 0) return item;
+  }
+  return table[table.length - 1][0];
+}
 
 // Hawaii midnight (UTC) for a YYYY-MM-DD date string
 const hawaiiMidnight = (dateStr) => {
@@ -37,49 +117,46 @@ const hawaiiMidnight = (dateStr) => {
 const ts = (midnight, hour, min) =>
   new Date(midnight.getTime() + (hour * 60 + min) * 60000).toISOString();
 
-// Get Hawaii date string for a day offset from today
+// Hawaii date string for N days ago
 const hawaiiDateOffset = (daysAgo) => {
   const todayHawaii = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Pacific/Honolulu",
   }).format(new Date());
   const [y, m, d] = todayHawaii.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d - daysAgo, 10, 0, 0));
-  return new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Pacific/Honolulu",
-  }).format(date);
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Pacific/Honolulu" }).format(date);
 };
 
 // Day-of-week in Hawaii (0=Sun..6=Sat)
 const hawaiiDow = (dateStr) => {
   const midnight = hawaiiMidnight(dateStr);
-  // Add 1ms so we're inside the day, subtract 10h to get Hawaii civil time
   const hDate = new Date(midnight.getTime() - 10 * 3600 * 1000 + 1);
   return hDate.getUTCDay();
 };
 
-function generateRandomDay(midnight, count) {
+function generateDay(midnight, count, dow) {
+  const productTable = PRODUCT_TABLES[dow] ?? PRODUCT_TABLES.default;
+  const trafficTable = TRAFFIC_TABLES[dow] ?? TRAFFIC_TABLES.default;
+  const trafficTotal = trafficTable.reduce((s, [, , w]) => s + w, 0);
+
   const logs = [];
   for (let i = 0; i < count; i++) {
-    let r = Math.random() * TOTAL_WEIGHT;
-    let [startH, endH] = TRAFFIC_WINDOWS[0];
-    for (const [s, e, w] of TRAFFIC_WINDOWS) {
+    let r = Math.random() * trafficTotal;
+    let [startH, endH] = trafficTable[0];
+    for (const [s, e, w] of trafficTable) {
       r -= w;
-      if (r <= 0) {
-        startH = s;
-        endH = e;
-        break;
-      }
+      if (r <= 0) { startH = s; endH = e; break; }
     }
     const offsetMin = Math.floor(Math.random() * (endH - startH) * 60);
     const h = startH + Math.floor(offsetMin / 60);
     const m = offsetMin % 60;
-    logs.push({ button_type: pick(PRODUCTS), time: ts(midnight, h, m) });
+    logs.push({ button_type: weightedPick(productTable), time: ts(midnight, h, m) });
   }
   logs.sort((a, b) => (a.time < b.time ? -1 : 1));
   return logs;
 }
 
-// Exact pattern from seed.mjs — used for one specific day
+// Exact pattern from seed.mjs — planted 45 days ago
 const SEED_MJS_PATTERN = [
   { p: "Nuggets", h: 6, m: 12 },
   { p: "Filets", h: 6, m: 28 },
@@ -146,19 +223,17 @@ async function postLog(buttonType, timeISO) {
   }
 }
 
-// seed.mjs day: 14 days ago (roughly 2 weeks back, a clear reference point)
-const SEED_MJS_DAY_OFFSET = 14;
+const SEED_MJS_DAY_OFFSET = 45;
 
 let totalOk = 0;
 let totalFail = 0;
 
-for (let daysAgo = 30; daysAgo >= 1; daysAgo--) {
+for (let daysAgo = 90; daysAgo >= 1; daysAgo--) {
   const dateStr = hawaiiDateOffset(daysAgo);
   const dow = hawaiiDow(dateStr);
 
-  // Chick-fil-A closed Sundays
   if (dow === 0) {
-    console.log(`\n  —  ${dateStr} (Sunday — closed)\n`);
+    console.log(`  —  ${dateStr} (Sunday — closed)`);
     continue;
   }
 
@@ -171,20 +246,17 @@ for (let daysAgo = 30; daysAgo >= 1; daysAgo--) {
   }).format(midnight);
 
   let logs;
-  let dayNote = "";
+  let dayNote = DAY_NOTES[dow] ? ` [${DAY_NOTES[dow]}]` : "";
 
   if (daysAgo === SEED_MJS_DAY_OFFSET) {
-    // Use exact seed.mjs pattern
     logs = SEED_MJS_PATTERN.map(({ p, h, m }) => ({
       button_type: p,
       time: ts(midnight, h, m),
     }));
-    dayNote = " ← seed.mjs pattern";
+    dayNote += " ← seed.mjs pattern";
   } else {
-    // Saturday slightly busier, weekdays normal
-    const isSat = dow === 6;
-    const count = isSat ? rand(30, 45) : rand(15, 35);
-    logs = generateRandomDay(midnight, count);
+    const [lo, hi] = COUNT_RANGE[dow] ?? [15, 30];
+    logs = generateDay(midnight, rand(lo, hi), dow);
   }
 
   console.log(`\n${label}${dayNote} — ${logs.length} logs`);
@@ -194,8 +266,8 @@ for (let daysAgo = 30; daysAgo >= 1; daysAgo--) {
     try {
       await postLog(button_type, time);
       ok++;
-      const h = new Date(time).getUTCHours();
-      const hawaiiH = (h - 10 + 24) % 24;
+      const utcH = new Date(time).getUTCHours();
+      const hawaiiH = (utcH - 10 + 24) % 24;
       const hawaiiM = new Date(time).getUTCMinutes();
       console.log(
         `  ✓  ${button_type.padEnd(20)} ${String(hawaiiH).padStart(2, "0")}:${String(hawaiiM).padStart(2, "0")} Hawaii`
