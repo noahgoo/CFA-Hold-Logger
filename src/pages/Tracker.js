@@ -9,12 +9,15 @@ function Tracker() {
   const [isBreakfastMode, setIsBreakfastMode] = useState(false);
   const [cooldowns, setCooldowns] = useState({}); // { [type]: true }
   const timerRefs = useRef({});                   // { [type]: { timerId, logId } }
+  const pendingRef = useRef(new Set());           // button types with in-flight Firebase calls
 
   useEffect(() => {
     return () => Object.values(timerRefs.current).forEach(({ timerId }) => clearTimeout(timerId));
   }, []);
 
   const handleButtonPress = async (buttonType) => {
+    if (cooldowns[buttonType] || pendingRef.current.has(buttonType)) return;
+    pendingRef.current.add(buttonType);
     try {
       const docRef = await logEvent(buttonType);
       const timerId = setTimeout(() => {
@@ -30,6 +33,8 @@ function Tracker() {
       setRefreshTrigger((v) => v + 1);
     } catch {
       alert("Error logging hold. Please try again.");
+    } finally {
+      pendingRef.current.delete(buttonType);
     }
   };
 
