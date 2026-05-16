@@ -12,6 +12,7 @@ const RecentLogs = ({ refreshTrigger, onLogDelete }) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [processingId, setProcessingId] = useState(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
@@ -77,8 +78,9 @@ const RecentLogs = ({ refreshTrigger, onLogDelete }) => {
     await fetchLogs(page, true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this log?")) return;
+  const confirmDelete = async () => {
+    const id = pendingDeleteId;
+    setPendingDeleteId(null);
     try {
       setProcessingId(id);
       await deleteLog(id);
@@ -167,7 +169,7 @@ const RecentLogs = ({ refreshTrigger, onLogDelete }) => {
               <span className="log-time">{formatTime(log.start_time)}</span>
               <button
                 className="log-delete"
-                onClick={() => handleDelete(log.id)}
+                onClick={() => setPendingDeleteId(log.id)}
                 disabled={processingId === log.id}
                 title="Delete"
               >
@@ -205,6 +207,18 @@ const RecentLogs = ({ refreshTrigger, onLogDelete }) => {
             >
               →
             </button>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteId && (
+        <div className="confirm-modal-overlay" onClick={() => setPendingDeleteId(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <p>Delete this log?</p>
+            <div className="confirm-modal-actions">
+              <button className="confirm-btn-cancel" onClick={() => setPendingDeleteId(null)}>Cancel</button>
+              <button className="confirm-btn-delete" onClick={confirmDelete}>Delete</button>
+            </div>
           </div>
         </div>
       )}

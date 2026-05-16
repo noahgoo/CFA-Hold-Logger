@@ -242,6 +242,63 @@ body {
   margin: 0;
 }
 
+/* ── Delete Confirmation Modal ── */
+.confirm-modal-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.confirm-modal {
+  background: var(--surface-high);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 28px;
+  text-align: center;
+  max-width: 260px;
+  width: 100%;
+}
+
+.confirm-modal p {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.4rem;
+  letter-spacing: 0.06em;
+  color: var(--text);
+  margin: 0 0 20px;
+}
+
+.confirm-modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.confirm-btn-cancel,
+.confirm-btn-delete {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.confirm-btn-cancel {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.confirm-btn-delete {
+  background: var(--red);
+  border-color: var(--red);
+  color: var(--text);
+}
+
 /* ── Button Label ── */
 .btn-label {
   font-family: 'Bebas Neue', sans-serif;
