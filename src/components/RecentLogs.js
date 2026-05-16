@@ -7,11 +7,12 @@ import {
 
 const PAGE_SIZE = 20;
 
-const RecentLogs = ({ refreshTrigger }) => {
+const RecentLogs = ({ refreshTrigger, onLogDelete }) => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [processingId, setProcessingId] = useState(null);
+  const [pendingDeleteId, setPendingDeleteId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
@@ -77,11 +78,13 @@ const RecentLogs = ({ refreshTrigger }) => {
     await fetchLogs(page, true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this log?")) return;
+  const confirmDelete = async () => {
+    const id = pendingDeleteId;
     try {
       setProcessingId(id);
       await deleteLog(id);
+      setPendingDeleteId(null);
+      onLogDelete?.(id);
       await fetchCount();
       if (logs.length === 1 && currentPage > 1) {
         await goToPage(currentPage - 1);
@@ -89,6 +92,7 @@ const RecentLogs = ({ refreshTrigger }) => {
         await fetchLogs(currentPage, true);
       }
     } catch {
+      setPendingDeleteId(null);
       alert("Failed to delete log");
     } finally {
       setProcessingId(null);
@@ -166,7 +170,7 @@ const RecentLogs = ({ refreshTrigger }) => {
               <span className="log-time">{formatTime(log.start_time)}</span>
               <button
                 className="log-delete"
-                onClick={() => handleDelete(log.id)}
+                onClick={() => setPendingDeleteId(log.id)}
                 disabled={processingId === log.id}
                 title="Delete"
               >
@@ -204,6 +208,18 @@ const RecentLogs = ({ refreshTrigger }) => {
             >
               →
             </button>
+          </div>
+        </div>
+      )}
+
+      {pendingDeleteId && (
+        <div className="modal-overlay" onClick={() => setPendingDeleteId(null)}>
+          <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
+            <p>Delete this log?</p>
+            <div className="confirm-modal-actions">
+              <button className="confirm-btn-cancel" onClick={() => setPendingDeleteId(null)}>Cancel</button>
+              <button className="confirm-btn-delete" onClick={confirmDelete}>Delete</button>
+            </div>
           </div>
         </div>
       )}
