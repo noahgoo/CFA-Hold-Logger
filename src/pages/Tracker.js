@@ -7,11 +7,11 @@ import { logEvent } from "../services/firebaseService";
 function Tracker() {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [isBreakfastMode, setIsBreakfastMode] = useState(false);
-  const [cooldowns, setCooldowns] = useState({}); // { [type]: logId }
-  const timerRefs = useRef({});                   // { [type]: timerId } — not in state
+  const [cooldowns, setCooldowns] = useState({}); // { [type]: true }
+  const timerRefs = useRef({});                   // { [type]: { timerId, logId } }
 
   useEffect(() => {
-    return () => Object.values(timerRefs.current).forEach(clearTimeout);
+    return () => Object.values(timerRefs.current).forEach(({ timerId }) => clearTimeout(timerId));
   }, []);
 
   const handleButtonPress = async (buttonType) => {
@@ -25,8 +25,8 @@ function Tracker() {
         });
         delete timerRefs.current[buttonType];
       }, 60000);
-      timerRefs.current[buttonType] = timerId;
-      setCooldowns((prev) => ({ ...prev, [buttonType]: docRef.id }));
+      timerRefs.current[buttonType] = { timerId, logId: docRef.id };
+      setCooldowns((prev) => ({ ...prev, [buttonType]: true }));
       setRefreshTrigger((v) => v + 1);
     } catch {
       alert("Error logging hold. Please try again.");
@@ -34,12 +34,12 @@ function Tracker() {
   };
 
   const handleLogDelete = (logId) => {
+    const entry = Object.entries(timerRefs.current).find(([, v]) => v.logId === logId);
+    if (!entry) return;
+    const [type, { timerId }] = entry;
+    clearTimeout(timerId);
+    delete timerRefs.current[type];
     setCooldowns((prev) => {
-      const entry = Object.entries(prev).find(([, id]) => id === logId);
-      if (!entry) return prev;
-      const [type] = entry;
-      clearTimeout(timerRefs.current[type]);
-      delete timerRefs.current[type];
       const next = { ...prev };
       delete next[type];
       return next;

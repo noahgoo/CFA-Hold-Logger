@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 
 const BREAKFAST_BUTTONS = [
   "Nuggets",
@@ -20,12 +20,28 @@ const LUNCH_DINNER_BUTTONS = [
 
 const ButtonGrid = ({ onButtonPress, isBreakfastMode, cooldowns }) => {
   const [modal, setModal] = useState(false);
+  const modalTimerRef = useRef(null);
+
+  useEffect(() => {
+    return () => clearTimeout(modalTimerRef.current);
+  }, []);
 
   const buttonTypes = isBreakfastMode ? BREAKFAST_BUTTONS : LUNCH_DINNER_BUTTONS;
 
+  const showModal = () => {
+    setModal(true);
+    clearTimeout(modalTimerRef.current);
+    modalTimerRef.current = setTimeout(() => setModal(false), 10000);
+  };
+
+  const hideModal = () => {
+    clearTimeout(modalTimerRef.current);
+    setModal(false);
+  };
+
   const handlePress = (type) => {
     if (cooldowns[type]) {
-      setModal(true);
+      showModal();
       return;
     }
     onButtonPress(type);
@@ -45,7 +61,7 @@ const ButtonGrid = ({ onButtonPress, isBreakfastMode, cooldowns }) => {
         ))}
       </div>
       {modal && (
-        <div className="cooldown-modal-overlay" onClick={() => setModal(false)}>
+        <div className="modal-overlay" onClick={hideModal}>
           <div className="cooldown-modal">
             <p>Please wait until the timeout is finished</p>
           </div>

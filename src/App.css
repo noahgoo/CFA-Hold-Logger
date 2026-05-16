@@ -212,10 +212,11 @@ body {
     -3px -3px 10px #1a0408,
     0 0 30px rgba(230, 14, 51, 0.4);
   cursor: not-allowed;
+  transition: background 0.3s ease, border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-/* ── Cooldown Modal ── */
-.cooldown-modal-overlay {
+/* ── Shared Modal Overlay ── */
+.modal-overlay {
   position: fixed;
   inset: 0;
   display: flex;
@@ -243,16 +244,6 @@ body {
 }
 
 /* ── Delete Confirmation Modal ── */
-.confirm-modal-overlay {
-  position: fixed;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  background: rgba(0, 0, 0, 0.45);
-}
-
 .confirm-modal {
   background: var(--surface-high);
   border: 1px solid var(--border);

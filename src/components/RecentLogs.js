@@ -80,10 +80,10 @@ const RecentLogs = ({ refreshTrigger, onLogDelete }) => {
 
   const confirmDelete = async () => {
     const id = pendingDeleteId;
-    setPendingDeleteId(null);
     try {
       setProcessingId(id);
       await deleteLog(id);
+      setPendingDeleteId(null);
       onLogDelete?.(id);
       await fetchCount();
       if (logs.length === 1 && currentPage > 1) {
@@ -92,6 +92,7 @@ const RecentLogs = ({ refreshTrigger, onLogDelete }) => {
         await fetchLogs(currentPage, true);
       }
     } catch {
+      setPendingDeleteId(null);
       alert("Failed to delete log");
     } finally {
       setProcessingId(null);
@@ -212,7 +213,7 @@ const RecentLogs = ({ refreshTrigger, onLogDelete }) => {
       )}
 
       {pendingDeleteId && (
-        <div className="confirm-modal-overlay" onClick={() => setPendingDeleteId(null)}>
+        <div className="modal-overlay" onClick={() => setPendingDeleteId(null)}>
           <div className="confirm-modal" onClick={(e) => e.stopPropagation()}>
             <p>Delete this log?</p>
             <div className="confirm-modal-actions">
