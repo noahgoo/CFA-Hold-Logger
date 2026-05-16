@@ -7,7 +7,7 @@ import {
 
 const PAGE_SIZE = 20;
 
-const RecentLogs = ({ refreshTrigger }) => {
+const RecentLogs = ({ refreshTrigger, onLogDelete }) => {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -82,6 +82,7 @@ const RecentLogs = ({ refreshTrigger }) => {
     try {
       setProcessingId(id);
       await deleteLog(id);
+      onLogDelete?.(id);
       await fetchCount();
       if (logs.length === 1 && currentPage > 1) {
         await goToPage(currentPage - 1);
